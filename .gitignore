@@ -1,0 +1,10 @@
+# Build outputs
+*.o
+*.elf
+*.bin
+*.hex
+*.map
+tags
+
+# Compiled files
+stm32f103_helloworld.*
