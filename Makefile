@@ -21,6 +21,18 @@ CFLAGS += -DSTM32F103C8T6
 CFLAGS += -DSTM32F103xB
 CFLAGS += -DUSE_FULL_LL_DRIVER
 
+# LCD功能使能 - 注释掉下面两行可禁用LCD功能
+#USE_LCD := 1
+ifdef USE_LCD
+CFLAGS += -DUSE_LCD_UC1701
+endif
+
+# WS2812B功能使能 - 注释掉下面两行可禁用WS2812B
+#USE_WS2812B := 1
+ifdef USE_WS2812B
+CFLAGS += -DUSE_WS2812B
+endif
+
 # 头文件包含路径
 CFLAGS += -I.
 CFLAGS += -I./STM32CubeF1/Drivers/CMSIS/Device/ST/STM32F1xx/Include
@@ -40,7 +52,16 @@ LDSCRIPT = stm32f103c8t6.ld
 
 # 源文件
 SRCS = main.c
+# LCD功能源文件 - 仅在USE_LCD定义时编译
+ifdef USE_LCD
 SRCS += lcd_uc1701.c
+endif
+
+# WS2812B功能源文件 - 仅在USE_WS2812B定义时编译
+ifdef USE_WS2812B
+SRCS += ws2812b.c
+endif
+
 SRCS += STM32CubeF1/Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/system_stm32f1xx.c
 SRCS += STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_rcc.c
 SRCS += STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_gpio.c

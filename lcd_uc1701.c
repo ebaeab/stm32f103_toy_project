@@ -2,6 +2,8 @@
 #include "ll_config.h"
 #include <stdint.h>
 
+#ifdef USE_LCD_UC1701
+
 // 显示缓冲区
 static uint8_t displayBuffer[LCD_PAGES][LCD_WIDTH];
 
@@ -365,3 +367,5 @@ void LCD_Cursor_Blink(void) {
         }
     }
 }
+
+#endif // USE_LCD_UC1701

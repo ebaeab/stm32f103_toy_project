@@ -4,6 +4,8 @@
 #include "ll_config.h"
 #include <stdint.h>
 
+#ifdef USE_LCD_UC1701
+
 // LCD引脚定义 - 根据实际硬件连接调整
 #define LCD_CS_PIN      LL_GPIO_PIN_0   // PB0 - 片选
 #define LCD_RST_PIN     LL_GPIO_PIN_1   // PB1 - 复位
@@ -60,4 +62,17 @@ void Display_Graphic_5x7(uint8_t page,uint8_t column,const uint8_t *dp);
 void LCD_Cursor_Enable(void);
 void LCD_Cursor_Disable(void);
 void LCD_Cursor_Blink(void);  // 在主循环中调用，实现闪烁
+
+#else // USE_LCD_UC1701 not defined
+
+// LCD功能禁用时提供空宏定义，避免编译错误
+#define LCD_Init()
+#define LCD_Clear()
+#define LCD_WriteString(s)
+#define LCD_Cursor_Enable()
+#define LCD_Cursor_Disable()
+#define LCD_Cursor_Blink()
+
+#endif // USE_LCD_UC1701
+
 #endif // LCD_UC1701_H

@@ -1,5 +1,10 @@
 #include "ll_config.h"
+#ifdef USE_LCD_UC1701
 #include "lcd_uc1701.h"
+#endif
+#ifdef USE_WS2812B
+#include "ws2812b.h"
+#endif
 #include <stdint.h>
 #include <string.h>
 
@@ -31,12 +36,24 @@ void Cmd_DateS(void);
 void Cmd_Clear(void);
 void Cmd_Ls(void);
 void Cmd_Default(void);
+#ifdef USE_WS2812B
+void Cmd_Led(void);
+void Cmd_LedSet(void);
+void Cmd_LedFill(void);
+void Cmd_LedRainbow(void);
+void Cmd_LedClear(void);
+void Cmd_LedNum(void);
+void Cmd_LedTest(void);
+#endif
 
 // 命令表（不包含子命令）
 CommandEntry cmd_table[] = {
     {"date", Cmd_Date},
     {"clear", Cmd_Clear},
     {"ls", Cmd_Ls},
+#ifdef USE_WS2812B
+    {"led", Cmd_Led},
+#endif
 };
 #define CMD_TABLE_SIZE (sizeof(cmd_table) / sizeof(cmd_table[0]))
 
@@ -325,6 +342,7 @@ void Cmd_Date(void) {
 
     USART1_SendString(buf);
 
+#ifdef USE_LCD_UC1701
     // LCD只显示时分秒
     uint8_to_2str(dt.hour, num_buf);
     strcpy(buf, num_buf);
@@ -336,6 +354,7 @@ void Cmd_Date(void) {
     strcat(buf, num_buf);
     strcat(buf, "\n");
     LCD_WriteString(buf);
+#endif
 }
 
 // dated命令：显示年月日
@@ -369,6 +388,7 @@ void Cmd_DateD(void) {
 
     USART1_SendString(buf);
 
+#ifdef USE_LCD_UC1701
     // LCD只显示年月日
     strcpy(buf, months[dt.month - 1]);
     strcat(buf, " ");
@@ -379,6 +399,7 @@ void Cmd_DateD(void) {
     strcat(buf, num_buf);
     strcat(buf, "\n");
     LCD_WriteString(buf);
+#endif
 }
 
 // 简单的字符串转数字
@@ -398,7 +419,9 @@ void Cmd_DateS(void) {
     char* time_str = strstr(cmd, "-s ");
     if (!time_str) {
         USART1_SendString("Usage: date -s YYYY-MM-DD HH:MM:SS\r\n");
+#ifdef USE_LCD_UC1701
         LCD_WriteString("Err: format\n");
+#endif
         return;
     }
     time_str += 3;  // 跳过 "-s "
@@ -407,7 +430,9 @@ void Cmd_DateS(void) {
     // 解析: YYYY-MM-DD HH:MM:SS
     if (strlen(time_str) < 19) {
         USART1_SendString("Usage: date -s YYYY-MM-DD HH:MM:SS\r\n");
+#ifdef USE_LCD_UC1701
         LCD_WriteString("Err: format\n");
+#endif
         return;
     }
 
@@ -424,7 +449,9 @@ void Cmd_DateS(void) {
         dt.day < 1 || dt.day > 31 ||
         dt.hour > 23 || dt.minute > 59 || dt.second > 59) {
         USART1_SendString("Invalid date/time\r\n");
+#ifdef USE_LCD_UC1701
         LCD_WriteString("Err: invalid\n");
+#endif
         return;
     }
 
@@ -434,16 +461,20 @@ void Cmd_DateS(void) {
     time_offset_sec = target_sec - (SysTick_Counter / 1000);
 
     USART1_SendString("Time set\r\n");
+#ifdef USE_LCD_UC1701
     LCD_WriteString("Time set\n");
+#endif
 }
 
 // clear命令：清除整个屏幕
 void Cmd_Clear(void) {
+#ifdef USE_LCD_UC1701
     extern uint8_t g_column;
     extern uint8_t g_page;
     LCD_Clear();
     g_column = 0;
     g_page = 0;
+#endif
     USART1_SendString("Screen cleared\r\n");
 }
 
@@ -453,11 +484,18 @@ void Cmd_Ls(void) {
     for (uint8_t i = 0; i < CMD_TABLE_SIZE; i++) {
         USART1_SendString("  ");
         USART1_SendString(cmd_table[i].name);
+#ifdef USE_LCD_UC1701
         LCD_WriteString(cmd_table[i].name);
         LCD_WriteString(" ");
+#endif
     }
     USART1_SendString("\r\n");
+#ifdef USE_WS2812B
+    USART1_SendString("  Use 'led' for LED subcommands\r\n");
+#endif
+#ifdef USE_LCD_UC1701
     LCD_WriteString("\n");
+#endif
 }
 
 // 默认命令
@@ -465,17 +503,21 @@ void Cmd_Default(void) {
     USART1_SendString("Unknown cmd: ");
     USART1_SendString((const char*)g_uart_rx_buffer);
     USART1_SendString("\r\n");
+#ifdef USE_LCD_UC1701
     LCD_WriteString("Err:");
     LCD_WriteString((const char*)g_uart_rx_buffer);
     LCD_WriteString("\n");
+#endif
 }
 
 // 命令解析执行函数
 void ProcessCommand(void) {
+#ifdef USE_LCD_UC1701
     // LCD回显命令
     LCD_WriteString("> ");
     LCD_WriteString((const char*)g_uart_rx_buffer);
     LCD_WriteString("\n");
+#endif
 
     uint8_t found = 0;
     char* cmd = (char*)g_uart_rx_buffer;
@@ -491,6 +533,32 @@ void ProcessCommand(void) {
             found = 1;
         }
     }
+
+#ifdef USE_WS2812B
+    // 检查是否是led子命令
+    if (strncmp(cmd, "led ", 4) == 0) {
+        char* subcmd = cmd + 4;
+        if (strncmp(subcmd, "set ", 4) == 0) {
+            Cmd_LedSet();
+            found = 1;
+        } else if (strncmp(subcmd, "fill ", 5) == 0) {
+            Cmd_LedFill();
+            found = 1;
+        } else if (strcmp(subcmd, "rainbow") == 0) {
+            Cmd_LedRainbow();
+            found = 1;
+        } else if (strcmp(subcmd, "clear") == 0) {
+            Cmd_LedClear();
+            found = 1;
+        } else if (strncmp(subcmd, "num ", 4) == 0) {
+            Cmd_LedNum();
+            found = 1;
+        } else if (strcmp(subcmd, "test") == 0) {
+            Cmd_LedTest();
+            found = 1;
+        }
+    }
+#endif
 
     // 普通命令匹配
     if (!found) {
@@ -518,27 +586,53 @@ int main(void) {
     // 串口初始化
     USART1_Init();
 
+#ifdef USE_LCD_UC1701
     // LCD初始化
     LCD_Init();
+#endif
+
+#ifdef USE_WS2812B
+    // WS2812B初始化
+    WS2812B_Init();
+#endif
 
     // 发送启动消息
     USART1_SendString("STM32F103C8T6 UC1701 LCD12864 Demo Started!\r\n");
     USART1_SendString("Clock: External 8MHz HSE (Real LL Library)\r\n");
     USART1_SendString("Baudrate: 115200\r\n");
+#ifdef USE_LCD_UC1701
     USART1_SendString("LCD on PB0,1,10,13,15\r\n");
+#endif
+#ifdef USE_WS2812B
+    USART1_SendString("WS2812B on PA0 (64 LEDs)\r\n");
+#endif
     USART1_SendString("LED on PB12 will blink every 500ms\r\n");
     USART1_SendString("UART Rx enabled (interrupt mode, buffer size: 128)\r\n");
+#ifdef USE_WS2812B
+    USART1_SendString("Available commands: date, clear, ls, led\r\n");
+#else
     USART1_SendString("Available commands: date, clear, ls\r\n");
+#endif
 
+#ifdef USE_LCD_UC1701
     LCD_WriteString(":) Welcome!\n");
 
     // 使能光标闪烁
     LCD_Cursor_Enable();
+#endif
+
+#ifdef USE_WS2812B
+    // 先简单清屏
+    WS2812B_Clear();
+    WS2812B_Update();
+#endif
 
     // 主循环
     while(1) {
+#ifdef USE_LCD_UC1701
         // 光标闪烁
         LCD_Cursor_Blink();
+#endif
 
         // 检查是否有新的串口数据接收完成
         if (g_uart_rx_complete) {
@@ -557,8 +651,8 @@ int main(void) {
         // 翻转LED状态
         LED_Toggle();
 
-        // 延时约500ms
-        LL_mDelay(500);
+        // 延时约100ms - 加快更新速度
+        LL_mDelay(100);
     }
 }
 
@@ -602,3 +696,204 @@ void PendSV_Handler(void) {}
 void SysTick_Handler(void) {
     SysTick_Counter++;
 }
+
+#ifdef USE_WS2812B
+
+// led命令：显示帮助
+void Cmd_Led(void) {
+    USART1_SendString("LED commands:\r\n");
+    USART1_SendString("  led set <index> <r> <g> <b>  - Set single LED (0-63)\r\n");
+    USART1_SendString("  led fill <r> <g> <b>           - Fill all LEDs\r\n");
+    USART1_SendString("  led rainbow                    - Rainbow effect\r\n");
+    USART1_SendString("  led clear                      - Clear all LEDs\r\n");
+    USART1_SendString("  led num <digit> [r] [g] [b]    - Show digit 0-9\r\n");
+    USART1_SendString("  led test                       - Test digits 0-9 in loop\r\n");
+}
+
+// 简单的字符串转数字
+static uint8_t str_to_uint8(const char* str) {
+    uint32_t num = 0;
+    while (*str >= '0' && *str <= '9') {
+        num = num * 10 + (*str - '0');
+        str++;
+    }
+    if (num > 255) num = 255;
+    return (uint8_t)num;
+}
+
+// 跳过空格
+static const char* skip_space(const char* str) {
+    while (*str == ' ') str++;
+    return str;
+}
+
+// 查找下一个空格
+static const char* find_space(const char* str) {
+    while (*str && *str != ' ') str++;
+    return str;
+}
+
+// led set命令：设置单个LED
+void Cmd_LedSet(void) {
+    char* cmd = (char*)g_uart_rx_buffer;
+    // 格式: "led set <index> <r> <g> <b>"
+    char* p = strstr(cmd, "set ");
+    if (!p) {
+        USART1_SendString("Usage: led set <index> <r> <g> <b>\r\n");
+        return;
+    }
+    p += 4;
+
+    // 解析参数
+    const char* s = skip_space(p);
+    const char* end = find_space(s);
+    if (s == end) {
+        USART1_SendString("Usage: led set <index> <r> <g> <b>\r\n");
+        return;
+    }
+    uint8_t index = str_to_uint8(s);
+    if (index >= 64) {
+        USART1_SendString("Index must be 0-63\r\n");
+        return;
+    }
+
+    s = skip_space(end);
+    end = find_space(s);
+    if (s == end) {
+        USART1_SendString("Usage: led set <index> <r> <g> <b>\r\n");
+        return;
+    }
+    uint8_t r = str_to_uint8(s);
+
+    s = skip_space(end);
+    end = find_space(s);
+    if (s == end) {
+        USART1_SendString("Usage: led set <index> <r> <g> <b>\r\n");
+        return;
+    }
+    uint8_t g = str_to_uint8(s);
+
+    s = skip_space(end);
+    uint8_t b = str_to_uint8(s);
+
+    WS2812B_SetPixel(index, r, g, b);
+    WS2812B_Update();
+
+    USART1_SendString("LED set\r\n");
+}
+
+// led fill命令：填充所有LED
+void Cmd_LedFill(void) {
+    char* cmd = (char*)g_uart_rx_buffer;
+    char* p = strstr(cmd, "fill ");
+    if (!p) {
+        USART1_SendString("Usage: led fill <r> <g> <b>\r\n");
+        return;
+    }
+    p += 5;
+
+    // 解析参数
+    const char* s = skip_space(p);
+    const char* end = find_space(s);
+    if (s == end) {
+        USART1_SendString("Usage: led fill <r> <g> <b>\r\n");
+        return;
+    }
+    uint8_t r = str_to_uint8(s);
+
+    s = skip_space(end);
+    end = find_space(s);
+    if (s == end) {
+        USART1_SendString("Usage: led fill <r> <g> <b>\r\n");
+        return;
+    }
+    uint8_t g = str_to_uint8(s);
+
+    s = skip_space(end);
+    uint8_t b = str_to_uint8(s);
+
+    WS2812B_Fill(r, g, b);
+    WS2812B_Update();
+
+    USART1_SendString("LED fill\r\n");
+}
+
+// led rainbow命令：彩虹效果
+void Cmd_LedRainbow(void) {
+    static uint8_t rainbow_offset = 0;
+    WS2812B_Rainbow(rainbow_offset);
+    WS2812B_Update();
+    rainbow_offset += 10;
+    USART1_SendString("Rainbow\r\n");
+}
+
+// led clear命令：清除所有LED
+void Cmd_LedClear(void) {
+    WS2812B_Clear();
+    WS2812B_Update();
+    USART1_SendString("LED clear\r\n");
+}
+
+// led num命令：显示单个数字
+void Cmd_LedNum(void) {
+    char* cmd = (char*)g_uart_rx_buffer;
+    char* p = strstr(cmd, "num ");
+    if (!p) {
+        USART1_SendString("Usage: led num <digit> [r] [g] [b]\r\n");
+        return;
+    }
+    p += 4;
+
+    const char* s = skip_space(p);
+    if (*s < '0' || *s > '9') {
+        USART1_SendString("Usage: led num <digit> [r] [g] [b]\r\n");
+        return;
+    }
+    uint8_t digit = *s - '0';
+
+    // 默认红色
+    uint8_t r = 64, g = 0, b = 0;
+
+    // 解析可选的颜色参数
+    s = find_space(s);
+    if (*s) {
+        s = skip_space(s);
+        const char* end = find_space(s);
+        if (s != end) {
+            r = str_to_uint8(s);
+            s = skip_space(end);
+            end = find_space(s);
+            if (s != end) {
+                g = str_to_uint8(s);
+                s = skip_space(end);
+                b = str_to_uint8(s);
+            }
+        }
+    }
+
+    WS2812B_ShowDigit(digit, r, g, b);
+
+    char buf[16];
+    buf[0] = '0' + digit;
+    buf[1] = '\r';
+    buf[2] = '\n';
+    buf[3] = '\0';
+    USART1_SendString("Show digit: ");
+    USART1_SendString(buf);
+}
+
+// led test命令：循环显示0-9
+void Cmd_LedTest(void) {
+    USART1_SendString("Testing digits 0-9...\r\n");
+
+    for (uint8_t d = 0; d <= 9; d++) {
+        WS2812B_ShowDigit(d, 0, 64, 0);  // 绿色
+        LL_mDelay(500);
+    }
+
+    WS2812B_Clear();
+    WS2812B_Update();
+    USART1_SendString("Test done\r\n");
+}
+
+#endif // USE_WS2812B
